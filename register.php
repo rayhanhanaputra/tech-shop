@@ -1,75 +1,87 @@
 <?php
-    session_start();
-    if ((isset($_SESSION['isLogin'])) && ($_SESSION['isLogin']==true))
-    {
-        header('Location: shop.php');
-        exit();
+session_start();
+
+function validateRegistrationInput($name, $email, $password, $passwordCheck)
+{
+    $register_valid = true;
+
+    if ((strlen($name) < 3) || (strlen($name) > 20)) {
+        $register_valid = false;
     }
-    if (isset($_POST['password'])) {
 
-        $register_valid = true;
-        //name
-        $name = $_POST['name'];
-        if ((strlen($name)<3) || (strlen($name)>20)) 
-        {
-            $register_valid = false;
+    $email_sanitize = filter_var($email, FILTER_SANITIZE_EMAIL);
+
+    if (
+        (strlen($email) < 4) || (strlen($email) > 30) ||
+        (filter_var($email, FILTER_VALIDATE_EMAIL) == false) ||
+        ($email != $email_sanitize)
+    ) {
+        $register_valid = false;
+    }
+
+    if ((strlen($password) < 6) || (strlen($password) > 30) || ($password != $passwordCheck)) {
+        $register_valid = false;
+    }
+
+    return $register_valid;
+}
+
+function registerUser($name, $email, $password)
+{
+    require_once "connect.php";
+    mysqli_report(MYSQLI_REPORT_STRICT);
+
+    try {
+        $connection = new mysqli($host, $db_user, $db_password, $db_name);
+        if ($connection->connect_errno != 0) {
+            throw new Exception(mysqli_connect_errno());
         }
-        //email
-        $email = $_POST['email'];
-        $email_sanitize = filter_var($email, FILTER_SANITIZE_EMAIL);
 
-        if ((strlen($email)<4) || (strlen($email)>30) || (filter_var($email, FILTER_VALIDATE_EMAIL)==false) || ($email != $email_sanitize)) 
-        {
-            $register_valid = false;
+        $result = $connection->query("SELECT id from user WHERE email='$email'");
+        if (!$result) {
+            throw new Exception($connection->error);
         }
 
-        //password
-        $password = $_POST['password'];
-        $password2 = $_POST['password_check'];
-        if ((strlen($password)<6) || (strlen($password)>30) || ($password != $password2))
-        {
-            $register_valid = false;
-        }
-
-        $_SESSION['name'] = $name;
-
-        require_once "connect.php";
-        mysqli_report(MYSQLI_REPORT_STRICT);
-
-        try
-        {
-            $connection = new mysqli($host, $db_user, $db_password, $db_name);
-            if ($connection->connect_errno!=0)
-            {
-                throw new Exception(mysqli_connect_errno());
-            }
-            else
-            {
-            //does this email already exists?
-            $result = $connection->query("SELECT id from user WHERE email='$email'");
-            if (!$result) throw new Exception($connection->error);
-            if (($result->num_rows) > 0)
-            {
-                $register_valid = false;
-                echo '<h2 style="text-align: center;color: #ed2d2d;">E-mail telah terdaftar di sistem</h2>';
-            }
-            if ($register_valid == true)
-            {
-                if ($connection->query("INSERT INTO user VALUES (NULL, '$name', '$email', '$password')"))
-                {
-                    $_SESSION['registered_successfully'] = true;
-                    header('Location: login.php');
-                }
-            }
+        if ($result->num_rows > 0) {
             $connection->close();
+            return 'E-mail telah terdaftar di sistem';
+        }
+
+        if ($connection->query("INSERT INTO user VALUES (NULL, '$name', '$email', '$password')")) {
+            $connection->close();
+            return 'success';
+        }
+
+        $connection->close();
+    } catch (Exception $e) {
+        return 'error';
+    }
+}
+
+// Handle form submission
+if ((isset($_SESSION['isLogin'])) && ($_SESSION['isLogin'] == true)) {
+    header('Location: shop.php');
+    exit();
+}
+
+if (isset($_POST['password'])) {
+    $register_valid = validateRegistrationInput($_POST['name'], $_POST['email'], $_POST['password'], $_POST['password_check']);
+
+    if ($register_valid === true) {
+        $result = registerUser($_POST['name'], $_POST['email'], $_POST['password']);
+
+        if ($result === 'E-mail telah terdaftar di sistem') {
+            echo '<h2 style="text-align: center;color: #ed2d2d;">E-mail telah terdaftar di sistem</h2>';
+        } elseif ($result === 'success') {
+            $_SESSION['registered_successfully'] = true;
+            header('Location: login.php');
+        } else {
+            header('Location: error.html');
         }
     }
-    catch(Exception $e)
-	{
-        header('Location: error.html');
-	}
 }
 ?>
+
 
 <HTML>
 <HEAD>

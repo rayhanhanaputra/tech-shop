@@ -1,17 +1,20 @@
 <?php
-session_start();
-if ((!isset($_SESSION['isLogin'])) && ($_SESSION['isLogin']==false))
-{
-	header('Location: login.php');
-	exit();
-}
-require_once("dbcontroller.php");
-$db_handle = new DBController();
-if(!empty($_GET["action"])) {
-switch($_GET["action"]) {
-	case "add":
-		if(!empty($_POST["quantity"])) {
-			$productByCode = $db_handle->runQuery("SELECT * FROM tblproduct WHERE code='" . $_GET["code"] . "'");
+class ShoppingCart {
+    public function processAction($action, $db_handle) {
+        if ($action === "add") {
+            $this->addToCart($db_handle);
+        } elseif ($action === "remove") {
+            $this->removeFromCart();
+        } elseif ($action === "empty") {
+            $this->emptyCart();
+        } elseif ($action === "checkout") {
+            $this->checkoutCart();
+        }
+    }
+
+    public function addToCart($db_handle) {
+        if (!empty($_POST["quantity"]) && !empty($_GET["code"])) {
+            $productByCode = $db_handle->runQuery("SELECT * FROM tblproduct WHERE code='" . $_GET["code"] . "'");
 			$itemArray = array($productByCode[0]["code"]=>array('name'=>$productByCode[0]["name"], 'code'=>$productByCode[0]["code"], 'quantity'=>$_POST["quantity"], 'price'=>$productByCode[0]["price"], 'image'=>$productByCode[0]["image"]));
 			
 			if(!empty($_SESSION["cart_item"])) {
@@ -30,26 +33,36 @@ switch($_GET["action"]) {
 			} else {
 				$_SESSION["cart_item"] = $itemArray;
 			}
+        }
+    }
+
+    public function removeFromCart() {
+        if (!empty($_GET["code"]) && !empty($_SESSION["cart_item"])) {
+            foreach($_SESSION["cart_item"] as $k => $v) {
+				if($_GET["code"] == $k)
+					unset($_SESSION["cart_item"][$k]);				
+				if(empty($_SESSION["cart_item"]))
+					unset($_SESSION["cart_item"]);
 		}
-	break;
-	case "remove":
-		if(!empty($_SESSION["cart_item"])) {
-			foreach($_SESSION["cart_item"] as $k => $v) {
-					if($_GET["code"] == $k)
-						unset($_SESSION["cart_item"][$k]);				
-					if(empty($_SESSION["cart_item"]))
-						unset($_SESSION["cart_item"]);
-			}
-		}
-	break;
-	case "empty":
-		unset($_SESSION["cart_item"]);
-	break;	
-	case "checkout":
-		unset($_SESSION["cart_item"]);
-		header('Location: order.php');
-	break;	
+        }
+    }
+
+    public function emptyCart() {
+        unset($_SESSION["cart_item"]);
+    }
+
+    public function checkoutCart() {
+        unset($_SESSION["cart_item"]);
+        header('Location: order.php');
+    }
 }
+
+// Usage
+$cart = new ShoppingCart();
+$db_handle = new DBController();
+
+if (!empty($_GET["action"])) {
+    $cart->processAction($_GET["action"], $db_handle);
 }
 ?>
 <HTML>

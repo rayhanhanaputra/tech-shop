@@ -1,54 +1,66 @@
 <?php
-    session_start();
-    if ((isset($_SESSION['isLogin'])) && ($_SESSION['isLogin']==true))
-    {
-        header('Location: shop.php');
-        exit();
-    }
-    if ((isset($_POST['email'])) && (isset($_POST['password'])))
-    {
-        require_once "connect.php";
-        $connection = @new mysqli($host, $db_user, $db_password, $db_name);
-        if ($connection->connect_errno != 0)
-        {
-            echo "Error code: ".$connection->connect_errno;
-        }
-        else {
+session_start();
 
+function authenticateUser($email, $password, $connection)
+{
+    if ($result = $connection->query(
+        sprintf("SELECT * FROM user WHERE email='%s'",
+            mysqli_real_escape_string($connection, $email)))
+    ) {
+        $users_number = $result->num_rows;
+
+        if ($users_number > 0) {
+            $row = $result->fetch_assoc();
+
+            if ($password == $row['password']) {
+                return [
+                    'isLogin' => true,
+                    'name' => $row['nama'],
+                    'clientID' => $row['id']
+                ];
+            } else {
+                return 'Login failed';
+            }
+        } else {
+            return 'Login failed';
+        }
+    } else {
+        return 'Login failed';
+    }
+}
+
+// Handle form submission
+if ((isset($_SESSION['isLogin'])) && ($_SESSION['isLogin'] == true)) {
+    header('Location: shop.php');
+    exit();
+}
+
+if ((isset($_POST['email'])) && (isset($_POST['password']))) {
+    require_once "connect.php";
+    $connection = @new mysqli($host, $db_user, $db_password, $db_name);
+    
+    if ($connection->connect_errno != 0) {
+        echo "Error code: " . $connection->connect_errno;
+    } else {
         $email = $_POST['email'];
         $password = $_POST['password'];
+        
+        $authResult = authenticateUser($email, $password, $connection);
 
-        if ($result = @$connection->query(
-            sprintf("SELECT * FROM user WHERE email='%s'",
-            mysqli_real_escape_string($connection,$email))))
-            {
-                $users_number = $result->num_rows;
-                if($users_number>0)
-                {
-                    $row = $result->fetch_assoc();
-                    
-                    if ($password == $row['password'])
-                    {
-                        $_SESSION['isLogin'] = true;
-                        $_SESSION['name'] = $row['nama'];
-                        $_SESSION['clientID'] = $row['id'];
-                        $result->free_result();
-                        header('Location: shop.php');
-                    }
-                    else 
-                    {
-                        echo '<h3 style="text-align: center; color: #ed2d2d; margin-top: 2%;">Kredential salah, silahkan coba lagi</h3>';
-                    }
-                }
-                else
-                {
-                    echo '<h3 style="text-align: center; color: #ed2d2d; margin-top: 2%;">Kredential salah, silahkan coba lagi</h3>';
-                } 
-            }
+        if (is_array($authResult) && $authResult['isLogin']) {
+            $_SESSION['isLogin'] = $authResult['isLogin'];
+            $_SESSION['name'] = $authResult['name'];
+            $_SESSION['clientID'] = $authResult['clientID'];
+            header('Location: shop.php');
+        } else {
+            echo '<h3 style="text-align: center; color: #ed2d2d; margin-top: 2%;">' . $authResult . '</h3>';
         }
+
         $connection->close();
     }
+}
 ?>
+
 <HTML>
 <HEAD>
 <TITLE>Home | Tech Shop</TITLE>
